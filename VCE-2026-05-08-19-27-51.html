@@ -1,0 +1,768 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MSPL 2026 - Mobile Cricket League</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #F9CD05;
+            --primary-text: #000000;
+            --bg-dark: #0f172a;
+            --glass-bg: rgba(15, 23, 42, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-dark); color: #ffffff; overflow-x: hidden; background-image: radial-gradient(circle at 50% 0%, #1e293b 0%, #0f172a 100%); min-height: 100vh; touch-action: manipulation; }
+        h1, h2, h3, .score-text { font-family: 'Oswald', sans-serif; text-transform: uppercase; }
+        .glass { background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: 1rem; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3); }
+        .theme-glass { background: linear-gradient(135deg, rgba(15,23,42,0.9) 0%, var(--primary) 200%); backdrop-filter: blur(12px); border-bottom: 4px solid var(--primary); color: #fff; }
+        .btn-theme { background-color: var(--primary); color: var(--primary-text); transition: all 0.2s ease; font-weight: 700; font-family: 'Oswald', sans-serif; letter-spacing: 1px; }
+        .btn-theme:active { transform: scale(0.95); }
+        .btn-theme:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        
+        .number-btn { background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 50%; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-family: 'Oswald', sans-serif; transition: all 0.2s; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+        .number-btn:active, .number-btn.selected { background: var(--primary); color: var(--primary-text); border-color: var(--primary); transform: scale(0.9); box-shadow: 0 0 20px var(--primary); }
+        
+        .modal-overlay { background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); }
+        .broadcast-panel { animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+        @keyframes slideIn { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 3px; }
+        .loader { border: 3px solid rgba(255,255,255,0.1); border-top: 3px solid var(--primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .player-checkbox:checked + div { background-color: rgba(249, 205, 5, 0.2); border-color: var(--primary); color: var(--primary); }
+    </style>
+</head>
+<body class="flex flex-col items-center p-4 md:p-8">
+
+    <header class="w-full max-w-md text-center mb-6 broadcast-panel">
+        <h1 class="text-4xl font-bold tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600 drop-shadow-lg">MSPL <span class="text-white">2026</span></h1>
+        <p class="text-sm text-gray-400 uppercase tracking-widest mt-1">Mobile Cricket League</p>
+    </header>
+
+    <main id="app" class="w-full max-w-md relative pb-20">
+        <!-- Screen: Home -->
+        <div id="screen-home" class="glass p-6 flex flex-col gap-4">
+            <h2 class="text-2xl text-center mb-4 text-yellow-400">Select Game Mode</h2>
+            <button onclick="app.hostGame()" class="btn-theme py-4 rounded-xl text-lg flex items-center justify-center gap-2"><i class="fas fa-wifi"></i> Host Multiplayer</button>
+            <div class="flex gap-2">
+                <input type="text" id="joinRoomId" placeholder="Enter Room ID" class="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-center uppercase font-bold text-white focus:outline-none focus:border-yellow-400">
+                <button onclick="app.joinGame()" class="btn-theme px-6 rounded-xl">JOIN</button>
+            </div>
+            <div class="relative flex py-2 items-center"><div class="flex-grow border-t border-slate-600"></div><span class="flex-shrink-0 mx-4 text-slate-400 text-sm">OR</span><div class="flex-grow border-t border-slate-600"></div></div>
+            <button onclick="app.startAI()" class="glass py-3 rounded-xl text-lg flex items-center justify-center gap-2 hover:bg-slate-800 transition"><i class="fas fa-robot"></i> Play vs AI</button>
+        </div>
+
+        <!-- Screen: Lobby -->
+        <div id="screen-lobby" class="hidden flex flex-col gap-4">
+            <div class="glass p-4 text-center">
+                <p class="text-sm text-gray-400">Room ID</p>
+                <h3 id="displayRoomId" class="text-2xl font-bold text-yellow-400 tracking-widest select-all">-</h3>
+                <p id="lobbyStatusText" class="text-xs text-green-400 mt-2"><i class="fas fa-circle-notch fa-spin"></i> Waiting...</p>
+            </div>
+            <div class="glass p-4">
+                <h3 class="text-xl text-center mb-4">Select Your Team</h3>
+                <div id="teamSelector" class="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-2"></div>
+                <button id="btnReady" onclick="app.toggleReady()" class="w-full py-3 mt-4 glass border-yellow-500 text-yellow-400 font-bold rounded-xl transition" disabled>SELECT TEAM FIRST</button>
+            </div>
+            <div class="glass p-4 flex justify-between items-center text-sm">
+                <div class="text-center w-1/2 border-r border-slate-600"><p class="text-gray-400">You</p><p id="myLobbyTeam" class="font-bold text-lg">-</p><p id="myReadyStatus" class="text-red-400"><i class="fas fa-times"></i> Not Ready</p></div>
+                <div class="text-center w-1/2"><p class="text-gray-400">Opponent</p><p id="oppLobbyTeam" class="font-bold text-lg">-</p><p id="oppReadyStatus" class="text-red-400"><i class="fas fa-times"></i> Not Ready</p></div>
+            </div>
+        </div>
+
+        <!-- Screen: Toss -->
+        <div id="screen-toss" class="hidden glass p-6 text-center flex flex-col items-center gap-6">
+            <h2 class="text-2xl text-yellow-400">The Toss</h2>
+            <div id="coinContainer" class="w-24 h-24 rounded-full bg-yellow-500 border-4 border-yellow-300 flex items-center justify-center text-3xl font-bold text-yellow-900 shadow-[0_0_20px_rgba(234,179,8,0.5)]">$</div>
+            <div id="tossActionArea" class="w-full"></div>
+        </div>
+
+        <!-- Screen: Game -->
+        <div id="screen-game" class="hidden flex flex-col gap-4">
+            <div class="theme-glass rounded-xl p-4 shadow-lg broadcast-panel flex flex-col relative">
+                <div class="flex justify-between items-center mb-2">
+                    <span id="uiBattingTeamName" class="font-bold tracking-wider text-sm opacity-90">TEAM</span>
+                    <span id="uiInningsText" class="text-xs bg-black bg-opacity-30 px-2 py-1 rounded">Innings 1</span>
+                </div>
+                <div class="flex justify-between items-end">
+                    <div class="flex items-baseline gap-2"><span id="uiScore" class="score-text text-5xl font-bold leading-none">0</span><span class="text-2xl font-bold opacity-80">/</span><span id="uiWickets" class="score-text text-3xl font-bold text-red-300">0</span></div>
+                    <div class="text-right"><div class="text-sm opacity-80 uppercase tracking-widest">Overs</div><div id="uiOvers" class="score-text text-2xl font-bold">0.0<span class="text-sm opacity-70">/20</span></div></div>
+                </div>
+                <div id="targetTracker" class="hidden mt-3 pt-2 border-t border-white border-opacity-20 text-center text-sm font-bold bg-black bg-opacity-20 rounded p-1">
+                    Need <span id="uiRunsNeeded" class="text-yellow-400">0</span> runs from <span id="uiBallsNeeded" class="text-yellow-400">0</span> balls
+                </div>
+            </div>
+
+            <div class="glass p-3 text-sm grid grid-cols-1 gap-2 broadcast-panel delay-100 relative">
+                <button id="btnImpact" onclick="app.showImpactModal()" class="absolute -top-3 -right-2 bg-yellow-500 text-black px-3 py-1 rounded-full font-bold text-xs shadow-lg hidden z-10 hover:scale-105 transition">⚡ IMPACT</button>
+                <div class="bg-black bg-opacity-30 p-2 rounded flex justify-between items-center border-l-2 border-yellow-400">
+                    <div class="flex gap-2 items-center"><i class="fas fa-caret-right text-yellow-400" id="strikerIndicator1"></i><span id="uiStrikerName" class="font-bold truncate w-32">-</span></div>
+                    <span class="font-bold"><span id="uiStrikerRuns">0</span> <span class="text-xs text-gray-400 font-normal">(<span id="uiStrikerBalls">0</span>)</span></span>
+                </div>
+                <div class="bg-black bg-opacity-30 p-2 rounded flex justify-between items-center">
+                    <div class="flex gap-2 items-center"><i class="fas fa-caret-right text-transparent" id="strikerIndicator2"></i><span id="uiNonStrikerName" class="font-bold truncate w-32">-</span></div>
+                    <span class="font-bold"><span id="uiNonStrikerRuns">0</span> <span class="text-xs text-gray-400 font-normal">(<span id="uiNonStrikerBalls">0</span>)</span></span>
+                </div>
+                <div class="mt-1 pt-2 border-t border-slate-600 flex justify-between text-gray-300"><span class="text-xs uppercase">Bowler</span><span id="uiBowlerName" class="font-bold">-</span></div>
+            </div>
+
+            <div class="glass p-4 flex flex-col items-center relative min-h-[220px] justify-center">
+                <div id="actionStatus" class="text-center text-sm mb-4 h-5 font-bold tracking-widest text-yellow-400 w-full truncate px-2">YOUR TURN</div>
+                
+                <div id="numberPad" class="w-full flex flex-col items-center">
+                    <div class="grid grid-cols-3 gap-3 mb-4 w-full px-4 max-w-[280px]">
+                        <button class="number-btn mx-auto" onclick="app.makeMove(1)">1</button>
+                        <button class="number-btn mx-auto" onclick="app.makeMove(2)">2</button>
+                        <button class="number-btn mx-auto" onclick="app.makeMove(3)">3</button>
+                        <button class="number-btn mx-auto" onclick="app.makeMove(4)">4</button>
+                        <button class="number-btn mx-auto" onclick="app.makeMove(5)">5</button>
+                        <button class="number-btn mx-auto" onclick="app.makeMove(6)">6</button>
+                    </div>
+                    <!-- 0 Button is ONLY dynamically shown when batting -->
+                    <button id="btn-0" class="hidden w-[200px] h-12 bg-slate-800 text-yellow-500 border-2 border-yellow-500 rounded-xl font-bold font-['Oswald'] text-lg shadow-[0_4px_15px_rgba(0,0,0,0.2)] active:scale-95 transition mb-2" onclick="app.makeMove(0)">0 (DEFENSE)</button>
+                </div>
+                
+                <div id="moveResults" class="flex justify-between w-full text-xs text-gray-400 px-4 mt-2">
+                    <div class="flex flex-col items-center"><span>You</span><div id="uiMyMove" class="text-2xl font-bold text-white mt-1 w-10 h-10 bg-slate-800 rounded flex items-center justify-center">-</div></div>
+                    <div class="flex flex-col items-center justify-center"><span id="uiResultBadge" class="px-3 py-1 bg-black rounded-full font-bold text-lg hidden">OUT!</span></div>
+                    <div class="flex flex-col items-center"><span>Opponent</span><div id="uiOppMove" class="text-2xl font-bold text-white mt-1 w-10 h-10 bg-slate-800 rounded flex items-center justify-center">-</div></div>
+                </div>
+            </div>
+
+            <button onclick="app.showScorecard()" class="w-full glass py-2 text-sm text-gray-300 flex justify-center gap-2 items-center hover:text-white transition"><i class="fas fa-list"></i> View Scorecard</button>
+        </div>
+
+        <!-- Screen: Result -->
+        <div id="screen-result" class="hidden glass p-6 text-center flex flex-col items-center gap-4">
+            <h2 class="text-3xl font-bold text-yellow-400 uppercase tracking-widest">Match End</h2>
+            <div id="resultText" class="text-xl font-bold my-4">Team Wins!</div>
+            <div class="w-full text-sm space-y-2 bg-black bg-opacity-30 p-4 rounded-lg text-left">
+                <div class="flex justify-between"><span id="resTeam1Name">Team 1</span><strong id="resTeam1Score">0/0</strong></div>
+                <div class="flex justify-between"><span id="resTeam2Name">Team 2</span><strong id="resTeam2Score">0/0</strong></div>
+            </div>
+            <button onclick="app.showScorecard()" class="w-full glass py-2 text-sm text-gray-300 flex justify-center gap-2 items-center hover:text-white transition mb-2"><i class="fas fa-list"></i> View Full Scorecard</button>
+            <button onclick="location.reload()" class="btn-theme w-full py-3 rounded-xl">PLAY AGAIN</button>
+        </div>
+    </main>
+
+    <!-- Modals -->
+    <!-- Squad Selection Modal -->
+    <div id="squadSelectionModal" class="hidden fixed inset-0 modal-overlay z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-slate-900 w-full sm:max-w-md h-[85vh] sm:h-[80vh] rounded-t-2xl sm:rounded-2xl border border-slate-700 flex flex-col shadow-2xl relative">
+            <div class="p-4 border-b border-slate-700 bg-slate-800 rounded-t-2xl flex justify-between items-center">
+                <div class="flex flex-col">
+                    <h3 id="squadModalTitle" class="font-bold text-lg text-yellow-400">Select Playing XI</h3>
+                    <div class="flex gap-4">
+                        <span id="squadModalCounter" class="text-xs text-gray-400">0/11 Selected</span>
+                        <span id="squadModalOSCounter" class="text-xs text-orange-400">0/4 ✈️</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex-grow overflow-y-auto p-4 space-y-2" id="squadListContainer"></div>
+            <div class="p-4 border-t border-slate-700 bg-slate-800">
+                <button id="btnConfirmSquad" onclick="app.handleSquadConfirm()" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-xl disabled:opacity-50 transition">CONFIRM XI</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Player Selection Modal (Batsman/Bowler) -->
+    <div id="playerSelectionModal" class="hidden fixed inset-0 modal-overlay z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-slate-900 w-full sm:max-w-md max-h-[80vh] rounded-t-2xl sm:rounded-2xl border border-slate-700 flex flex-col shadow-2xl">
+            <div class="p-4 border-b border-slate-700 bg-slate-800 rounded-t-2xl"><h3 id="psModalTitle" class="font-bold text-lg text-yellow-400">Select Player</h3></div>
+            <div class="flex-grow overflow-y-auto p-4 space-y-2" id="psListContainer"></div>
+            <div class="p-4 border-t border-slate-700 bg-slate-800 hidden" id="psConfirmArea">
+                <button id="btnConfirmPS" onclick="app.confirmPlayerSelection()" class="w-full bg-yellow-500 text-black font-bold py-3 rounded-xl disabled:opacity-50">CONFIRM</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Impact Player Swap Modal -->
+    <div id="impactSwapModal" class="hidden fixed inset-0 modal-overlay z-[55] flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-slate-900 w-full sm:max-w-md h-[80vh] sm:h-auto sm:max-h-[80vh] rounded-t-2xl sm:rounded-2xl border border-slate-700 flex flex-col shadow-2xl">
+            <div class="p-4 border-b border-slate-700 bg-slate-800 rounded-t-2xl">
+                <h3 class="font-bold text-lg text-yellow-400">⚡ Sub in Impact Player</h3>
+            </div>
+            <div class="flex-grow overflow-y-auto p-4">
+                <p class="text-xs text-gray-400 mb-2 font-bold uppercase">1. Select Sub to bring in:</p>
+                <div id="impactInList" class="space-y-2 mb-4 border-b border-slate-700 pb-4"></div>
+                <p class="text-xs text-gray-400 mb-2 font-bold uppercase">2. Select Active Player to replace:</p>
+                <div id="impactOutList" class="space-y-2"></div>
+            </div>
+            <div class="p-4 border-t border-slate-700 bg-slate-800 flex gap-2">
+                <button onclick="document.getElementById('impactSwapModal').classList.add('hidden')" class="w-1/3 glass text-white py-3 rounded-xl">CANCEL</button>
+                <button id="btnConfirmSwap" onclick="app.confirmImpactSwap()" class="w-2/3 bg-yellow-500 text-black font-bold py-3 rounded-xl disabled:opacity-50" disabled>SWAP</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scorecard Modal -->
+    <div id="scorecardModal" class="hidden fixed inset-0 modal-overlay z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+        <div class="bg-slate-900 w-full sm:max-w-md h-[90vh] sm:h-[85vh] rounded-t-2xl sm:rounded-2xl border border-slate-700 flex flex-col shadow-2xl">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800 rounded-t-2xl">
+                <h3 class="font-bold text-lg text-yellow-400">Match Scorecard</h3>
+                <button onclick="document.getElementById('scorecardModal').classList.add('hidden')" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <div class="flex-grow overflow-y-auto p-4 space-y-6" id="scorecardContent"></div>
+        </div>
+    </div>
+
+    <!-- Waiting Overlay -->
+    <div id="waitingOverlay" class="hidden fixed inset-0 modal-overlay z-[110] flex flex-col items-center justify-center p-6 text-center">
+        <div class="loader mb-4"></div>
+        <h3 id="waitingText" class="text-xl font-bold text-yellow-400">Waiting for Opponent...</h3>
+    </div>
+
+    <script>
+        // 1. IP SAFE DATA - City + Nickname & Initial + Surname Format (100% legal compliance)
+        const TEAMS = {
+            CY: { id: 'CY', name: 'Chennai Yellows', color: '#F9CD05', textColor: '#000000', squad: ['R. Gaikwad', 'M. Dhonee', 'S. Samson', 'S. Dubey', 'S. Gopal', 'K. Ahmed', 'A. Mhatre', 'D. Brevis ✈️', 'U. Patel', 'M. Choudhary', 'N. Ellis ✈️', 'N. Ahmad ✈️', 'R. Ghosh', 'A. Kamboj', 'G. Singh', 'J. Overton ✈️', 'A. Hosein ✈️', 'P. Veer', 'K. Sharma', 'M. Short ✈️', 'A. Khan', 'S. Khan', 'M. Henry ✈️', 'R. Chahar', 'J. Foulkes ✈️'] },
+            DR: { id: 'DR', name: 'Delhi Roar', color: '#0044b3', textColor: '#FFFFFF', squad: ['A. Patel', 'K. Jamieson ✈️', 'K. Rahul', 'A. Porel', 'T. Stubbs ✈️', 'K. Nair', 'S. Rizvi', 'A. Sharma', 'V. Nigam', 'A. Mandal', 'T. Vijay', 'M. Tiwari', 'N. Rana', 'M. Starc ✈️', 'T. Natarajan', 'M. Kumar', 'D. Chameera ✈️', 'K. Yadav', 'B. Duckett ✈️', 'D. Miller ✈️', 'A. Dar', 'P. Nissanka ✈️', 'L. Ngidi ✈️', 'S. Parakh', 'P. Shaw'] },
+            BR: { id: 'BR', name: 'Bangalore Reds', color: '#E32A26', textColor: '#FFFFFF', squad: ['V. Kohlee', 'R. Patidar', 'D. Padikkal', 'J. Sharma', 'P. Salt ✈️', 'T. David ✈️', 'J. Bethell ✈️', 'K. Pandya', 'R. Shepherd ✈️', 'J. Hazlewood ✈️', 'N. Thushara ✈️', 'A. Singh', 'B. Kumar', 'R. Dar', 'S. Sharma', 'S. Singh', 'Y. Dayal', 'V. Iyer', 'J. Duffy ✈️', 'M. Yadav', 'S. Deswal', 'J. Cox ✈️', 'K. Chouhan', 'V. Ostwal', 'V. Malhotra'] },
+            LN: { id: 'LN', name: 'Lucknow Nawabs', color: '#25C8F3', textColor: '#000000', squad: ['R. Pantt', 'M. Marsh ✈️', 'N. Pooran ✈️', 'A. Markram ✈️', 'H. Singh', 'A. Samad', 'S. Ahmad', 'A. Kulkarni', 'A. Badoni', 'M. Shami', 'A. Khan', 'M. Siddharth', 'A. Singh', 'D. Rathi', 'P. Yadav', 'A. Tendulkar', 'M. Yadav', 'M. Khan', 'N. Tiwari', 'A. Nortje ✈️', 'W. Hasaranga ✈️', 'M. Choudhary', 'A. Raghuwanshi', 'J. Inglis ✈️'] },
+            MB: { id: 'MB', name: 'Mumbai Blues', color: '#004BA0', textColor: '#FFFFFF', squad: ['H. Pandyya', 'R. Sharmma', 'N. Dhir', 'S. Yadav', 'R. Rickelton ✈️', 'S. Rutherford ✈️', 'C. Bosch ✈️', 'R. Minz', 'R. Bawa', 'W. Jacks ✈️', 'M. Santner ✈️', 'T. Varma', 'A. Kumar', 'J. Bumrah', 'T. Boult ✈️', 'M. Markande', 'A. Ghazanfar ✈️', 'D. Chahar', 'S. Thakur', 'R. Sharma', 'M. Izhar', 'D. Malewar', 'Q. de Kock ✈️', 'M. Rawat', 'A. Ankolekar'] },
+            GG: { id: 'GG', name: 'Gujarat Guardians', color: '#1B2133', textColor: '#EAB308', squad: ['S. Gill', 'J. Buttler ✈️', 'K. Kushagra', 'A. Rawat', 'G. Phillips ✈️', 'N. Sindhu', 'W. Sundar', 'M. Arshad', 'S. Kishore', 'J. Yadav', 'S. Sudharsan', 'S. Khan', 'K. Rabada ✈️', 'M. Siraj', 'P. Krishna', 'M. Suthar', 'G. Brar', 'I. Sharma', 'R. Tewatia', 'R. Khan ✈️', 'A. Sharma', 'J. Holder ✈️', 'P. Raj', 'L. Wood ✈️', 'T. Banton ✈️'] },
+            KP: { id: 'KP', name: 'Kolkata Purples', color: '#3A225D', textColor: '#F9CD05', squad: ['A. Rahane', 'A. Raghuvanshi', 'M. Pandey', 'R. Singh', 'R. Powell ✈️', 'R. Singh', 'S. Narine ✈️', 'A. Roy', 'V. Arora', 'H. Rana', 'V. Chakravarthy', 'C. Green ✈️', 'M. Pathirana ✈️', 'F. Allen ✈️', 'S. Ranjan', 'P. Solanki', 'K. Tyagi', 'T. Seifert ✈️', 'U. Malik', 'M. Rahman ✈️', 'R. Ravindra ✈️', 'R. Tripathi', 'A. Deep', 'D. Kamra', 'T. Singh'] },
+            RP: { id: 'RP', name: 'Rajasthan Pinks', color: '#EA1A85', textColor: '#FFFFFF', squad: ['R. Parag', 'R. Jadeja', 'Y. Jaiswal', 'S. Dubey', 'D. Jurel', 'L. Pretorius ✈️', 'V. Sooryavanshi', 'S. Curran ✈️', 'S. Hetmyer ✈️', 'D. Ferreira ✈️', 'B. Sharma', 'J. Archer ✈️', 'T. Deshpande', 'S. Sharma', 'N. Burger ✈️', 'K. Maphaka ✈️', 'A. Milne ✈️', 'R. Bishnoi', 'S. Mishra', 'Y. Punga', 'V. Puthur', 'R. Singh', 'K. Sen', 'A. Perala', 'Y. Charak'] },
+            PL: { id: 'PL', name: 'Punjab Lions', color: '#ED1B24', textColor: '#FFFFFF', squad: ['S. Iyer', 'N. Wadhera', 'V. Vinod', 'H. Pannu', 'P. Avinash', 'P. Singh', 'S. Singh', 'M. Stoinis ✈️', 'H. Brar', 'M. Jansen ✈️', 'A. Omarzai ✈️', 'P. Arya', 'M. Khan', 'S. Shedge', 'M. Owen ✈️', 'A. Singh', 'Y. Chahal', 'V. Vijaykumar', 'Y. Thakur', 'X. Bartlett ✈️', 'L. Ferguson ✈️', 'C. Connolly ✈️', 'B. Dwarshuis ✈️', 'P. Dubey', 'V. Nishad'] },
+            HO: { id: 'HO', name: 'Hyderabad Oranges', color: '#F26522', textColor: '#000000', squad: ['P. Cummins ✈️', 'A. Verma', 'I. Kishan', 'H. Klaasen ✈️', 'T. Head ✈️', 'H. Patel', 'K. Mendis ✈️', 'H. Dubey', 'B. Carse ✈️', 'A. Sharma', 'N. Reddy', 'S. Ravichandran', 'Z. Ansari', 'J. Unadkat', 'E. Malinga ✈️', 'S. Kumar', 'S. Arora', 'K. Fuletra', 'P. Hinge', 'A. Kumar', 'S. Hussain', 'O. Tarmale', 'L. Livingstone ✈️', 'S. Mavi', 'J. Edwards ✈️'] }
+        };
+
+        const CONSTANTS = { MAX_OVERS: 20, BALLS_PER_OVER: 6, WICKETS: 10, MAX_BALLS: 120 };
+
+        const AudioEngine = {
+            ctx: null, init() { if(!this.ctx) this.ctx=new(window.AudioContext||window.webkitAudioContext)(); if(this.ctx.state==='suspended')this.ctx.resume(); },
+            playHit() { if(!this.ctx)return; const o=this.ctx.createOscillator(),g=this.ctx.createGain(); o.connect(g);g.connect(this.ctx.destination); o.type='triangle';o.frequency.setValueAtTime(180,this.ctx.currentTime);o.frequency.exponentialRampToValueAtTime(40,this.ctx.currentTime+0.1);g.gain.setValueAtTime(1,this.ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,this.ctx.currentTime+0.1);o.start();o.stop(this.ctx.currentTime+0.1); },
+            playOut() { if(!this.ctx)return; const o=this.ctx.createOscillator(),g=this.ctx.createGain(); o.connect(g);g.connect(this.ctx.destination); o.type='sawtooth';o.frequency.setValueAtTime(400,this.ctx.currentTime);o.frequency.exponentialRampToValueAtTime(50,this.ctx.currentTime+0.3);g.gain.setValueAtTime(1,this.ctx.currentTime);g.gain.exponentialRampToValueAtTime(0.01,this.ctx.currentTime+0.4);o.start();o.stop(this.ctx.currentTime+0.4); }
+        };
+        const Haptics = { vibrate(p) { if(navigator.vibrate)navigator.vibrate(p); }, run(){this.vibrate(50);}, boundary(){this.vibrate([100,50,100]);}, out(){this.vibrate([200,100,300]);} };
+
+        const app = {
+            peer: null, conn: null, mode: null, role: null, myTeamId: null, oppTeamId: null,
+            mySquad: [], oppSquad: [], // Arrays of 15 strings (0-10 = XI, 11-14 = Impact Subs)
+            amIReady: false, isOppReady: false,
+            tempSelectionMode: 'XI', tempSelectedPlayers: [],
+            psMode: null, psSelections: [], tempImpactIn: null, tempImpactOut: null,
+
+            state: {
+                phase: 'LOBBY', 
+                teams: { HOST: null, GUEST: null },
+                squadNames: { HOST: [], GUEST: [] }, 
+                impactPlayerUsed: { HOST: false, GUEST: false },
+                toss: { winner: null, decision: null },
+                battingRole: null, innings: 1, target: null,
+                maxBalls: CONSTANTS.MAX_BALLS, maxWickets: CONSTANTS.WICKETS,
+                selectionsReady: { HOST: false, GUEST: false },
+                needsBatter: false, needsBowler: false,
+                score: { HOST: { runs:0, wickets:0, balls:0, squadStats:[] }, GUEST: { runs:0, wickets:0, balls:0, squadStats:[] } },
+                current: { strikerIdx: -1, nonStrikerIdx: -1, bowlerIdx: -1 }
+            },
+            
+            pendingHostMove: null, pendingGuestMove: null,
+
+            showScreen(id) { ['screen-home','screen-lobby','screen-toss','screen-game','screen-result'].forEach(s=>document.getElementById(s).classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); },
+            setWaiting(show, t='Waiting...') { document.getElementById('waitingText').innerText=t; show?document.getElementById('waitingOverlay').classList.remove('hidden'):document.getElementById('waitingOverlay').classList.add('hidden'); },
+
+            init() {
+                const c = document.getElementById('teamSelector');
+                Object.values(TEAMS).forEach(t => {
+                    const b = document.createElement('button');
+                    b.className = `p-2 rounded-lg border-2 border-slate-600 text-sm font-bold h-16 transition`;
+                    b.style.background = `linear-gradient(to bottom right, rgba(15,23,42,1), ${t.color}40)`;
+                    b.innerText = t.name; b.onclick = () => this.initSquadSelection(t.id, b); c.appendChild(b);
+                });
+            },
+
+            // NETWORKING
+            initPeer(isHost) {
+                AudioEngine.init(); this.setWaiting(true, 'Connecting...');
+                this.peer = new Peer({ config: {'iceServers': [{urls:'stun:stun.l.google.com:19302'}]} });
+                this.peer.on('open', id => { this.setWaiting(false); if(isHost){ document.getElementById('displayRoomId').innerText=id; this.showScreen('screen-lobby'); }else{ this.connectToHost(document.getElementById('joinRoomId').value.trim()); } });
+                this.peer.on('connection', conn => { if(this.role==='HOST'&&!this.conn){ this.conn=conn; this.setupConn(); document.getElementById('lobbyStatusText').innerHTML=`<i class="fas fa-check text-green-400"></i> Connected!`; }else if(this.role==='HOST') conn.close(); });
+                this.peer.on('error', err => { this.setWaiting(false); alert("Error: "+err.type); });
+            },
+            hostGame() { this.mode='MULTIPLAYER'; this.role='HOST'; this.initPeer(true); },
+            joinGame() { const id=document.getElementById('joinRoomId').value.trim(); if(!id)return; this.mode='MULTIPLAYER'; this.role='GUEST'; this.initPeer(false); },
+            startAI() {
+                AudioEngine.init(); this.mode='AI'; this.role='HOST'; document.getElementById('displayRoomId').innerText="VS-AI";
+                this.oppTeamId = Object.keys(TEAMS)[Math.floor(Math.random()*10)];
+                let aiFull = [...TEAMS[this.oppTeamId].squad].sort(()=>0.5-Math.random());
+                this.oppSquad = aiFull.slice(0, 15); this.isOppReady=true;
+                this.showScreen('screen-lobby'); this.updateLobbyUI();
+            },
+            connectToHost(id) { this.setWaiting(true, 'Joining...'); this.conn=this.peer.connect(id,{reliable:true}); this.setupConn(); },
+            setupConn() {
+                this.conn.on('open', ()=>{ this.setWaiting(false); if(this.role==='GUEST'){ document.getElementById('displayRoomId').innerText="Connected"; this.showScreen('screen-lobby'); } });
+                this.conn.on('data', d => this.handleNetData(d));
+                this.conn.on('close', ()=>{ alert("Disconnected"); location.reload(); });
+            },
+            sendData(type, payload) { if(this.mode==='MULTIPLAYER'&&this.conn&&this.conn.open) this.conn.send({type, payload}); },
+            
+            handleNetData(d) {
+                if(this.role==='HOST') {
+                    if(d.type==='TOSS_CALL') this.resolveToss(d.payload);
+                    else if(d.type==='TOSS_DECISION') this.startMatch(d.payload);
+                    else if(d.type==='MOVE') { this.pendingGuestMove=d.payload; this.checkResolveTurn(); }
+                    else if(d.type==='IMPACT_SUB') this.applyImpactPlayer(d.payload.team, d.payload.inIdx, d.payload.outIdx);
+                    else if(d.type==='SELECT_BATTERS') { this.state.current.strikerIdx=d.payload[0]; this.state.current.nonStrikerIdx=d.payload[1]; this.state.score[this.state.battingRole].squadStats[d.payload[0]].isBatting=true; this.state.score[this.state.battingRole].squadStats[d.payload[1]].isBatting=true; this.state.selectionsReady.GUEST=true; this.checkPlayResume(); this.syncState(); }
+                    else if(d.type==='SELECT_BATTER') { this.state.current.strikerIdx=d.payload; this.state.score[this.state.battingRole].squadStats[d.payload].isBatting=true; this.state.needsBatter=false; this.checkNextPhase(); this.syncState(); }
+                    else if(d.type==='SELECT_BOWLER') { this.state.current.bowlerIdx=d.payload; this.state.needsBowler=false; this.checkNextPhase(); this.syncState(); }
+                }
+                if(d.type==='LOBBY_UPDATE') { this.oppTeamId=d.payload.team; this.oppSquad=d.payload.squad; this.isOppReady=d.payload.ready; this.updateLobbyUI(); if(this.role==='HOST')this.checkLobbyComplete(); }
+                else if(d.type==='STATE_SYNC') { this.state=d.payload; this.renderState(); }
+            },
+
+            // SQUAD SELECTION
+            initSquadSelection(tid, btn) {
+                if(this.amIReady)return; this.myTeamId=tid;
+                document.querySelectorAll('#teamSelector button').forEach(b=>b.style.borderColor='#475569'); btn.style.borderColor=TEAMS[tid].color;
+                this.tempSelectionMode='XI'; this.tempSelectedPlayers=[]; this.renderSquadModal();
+                document.getElementById('squadSelectionModal').classList.remove('hidden');
+            },
+            renderSquadModal() {
+                const c = document.getElementById('squadListContainer'); c.innerHTML='';
+                const full = TEAMS[this.myTeamId].squad;
+                document.getElementById('squadModalTitle').innerText = this.tempSelectionMode==='XI' ? "Select Playing XI" : "Select 4 Impact Subs";
+                this.updateSquadCounter();
+                full.forEach(p => {
+                    if(this.tempSelectionMode==='IMPACT' && this.mySquad.includes(p)) return;
+                    const isOS = p.includes('✈️');
+                    const isCh = this.tempSelectedPlayers.includes(p);
+                    const label = document.createElement('label'); label.className="flex items-center cursor-pointer mb-2 relative";
+                    label.innerHTML=`<input type="checkbox" class="player-checkbox hidden" value="${p}" ${isCh?'checked':''} onchange="app.togglePlayerSelection(this)">
+                        <div class="w-full p-3 rounded-lg border border-slate-600 flex justify-between items-center transition bg-slate-800"><span class="font-semibold text-sm ${isOS?'text-orange-300':''}">${p}</span><i class="fas fa-check-circle text-transparent transition"></i></div>`;
+                    c.appendChild(label);
+                });
+            },
+            togglePlayerSelection(cb) {
+                const p = cb.value; const max = this.tempSelectionMode==='XI'?11:4;
+                if(cb.checked) {
+                    if(this.tempSelectedPlayers.length >= max) { cb.checked=false; return; }
+                    if(this.tempSelectionMode==='XI' && p.includes('✈️')) {
+                        let osCount = this.tempSelectedPlayers.filter(x=>x.includes('✈️')).length;
+                        if(osCount >= 4) { cb.checked=false; alert("Max 4 Overseas players allowed in Playing XI."); return; }
+                    }
+                    this.tempSelectedPlayers.push(p); cb.nextElementSibling.querySelector('i').classList.replace('text-transparent','text-current');
+                } else {
+                    this.tempSelectedPlayers = this.tempSelectedPlayers.filter(x=>x!==p);
+                    cb.nextElementSibling.querySelector('i').classList.replace('text-current','text-transparent');
+                }
+                this.updateSquadCounter();
+            },
+            updateSquadCounter() {
+                const max = this.tempSelectionMode==='XI'?11:4;
+                document.getElementById('squadModalCounter').innerText = `${this.tempSelectedPlayers.length}/${max} Selected`;
+                let osCount = this.tempSelectedPlayers.filter(x=>x.includes('✈️')).length;
+                document.getElementById('squadModalOSCounter').innerText = this.tempSelectionMode==='XI' ? `${osCount}/4 ✈️` : '';
+                document.getElementById('btnConfirmSquad').disabled = (this.tempSelectedPlayers.length !== max);
+            },
+            handleSquadConfirm() {
+                if(this.tempSelectionMode==='XI') { this.mySquad=[...this.tempSelectedPlayers]; this.tempSelectionMode='IMPACT'; this.tempSelectedPlayers=[]; this.renderSquadModal(); }
+                else { this.mySquad = this.mySquad.concat(this.tempSelectedPlayers); document.getElementById('squadSelectionModal').classList.add('hidden'); document.getElementById('btnReady').disabled=false; document.getElementById('myLobbyTeam').innerText=TEAMS[this.myTeamId].name; this.toggleReady(); }
+            },
+
+            // LOBBY
+            toggleReady() {
+                this.amIReady=true; document.getElementById('btnReady').innerText="WAITING..."; document.getElementById('btnReady').className="w-full py-3 mt-4 bg-yellow-500 text-black font-bold rounded-xl transition";
+                this.updateLobbyUI(); this.sendData('LOBBY_UPDATE',{team:this.myTeamId,ready:this.amIReady,squad:this.mySquad}); if(this.role==='HOST')this.checkLobbyComplete();
+            },
+            updateLobbyUI() {
+                document.getElementById('myReadyStatus').innerHTML=this.amIReady?'<i class="fas fa-check"></i> Ready':'<i class="fas fa-times"></i> Not Ready'; document.getElementById('myReadyStatus').className=this.amIReady?'text-green-400':'text-red-400';
+                document.getElementById('oppLobbyTeam').innerText=this.oppTeamId ? TEAMS[this.oppTeamId].name : '-'; document.getElementById('oppReadyStatus').innerHTML=this.isOppReady?'<i class="fas fa-check"></i> Ready':'<i class="fas fa-times"></i> Not Ready'; document.getElementById('oppReadyStatus').className=this.isOppReady?'text-green-400':'text-red-400';
+            },
+            checkLobbyComplete() {
+                if(this.amIReady && this.isOppReady) {
+                    this.state.teams.HOST=this.myTeamId; this.state.teams.GUEST=this.oppTeamId;
+                    this.state.squadNames.HOST=this.mySquad; this.state.squadNames.GUEST=this.oppSquad;
+                    this.state.phase='TOSS';
+                    ['HOST','GUEST'].forEach(r=>{ for(let i=0;i<15;i++){ this.state.score[r].squadStats.push({runs:0,balls:0,out:false,isBatting:false,subbedOut:false,isActive:(i<11),isImpact:(i>=11),overBalls:0,oversBowled:0,runsConceded:0,wicketsTaken:0}); } });
+                    this.syncState();
+                }
+            },
+
+            // TOSS
+            renderToss() {
+                this.showScreen('screen-toss'); const a = document.getElementById('tossActionArea');
+                if(this.state.toss.winner) {
+                    if((this.role===this.state.toss.winner) || (this.mode==='AI'&&this.state.toss.winner==='HOST')) { a.innerHTML=`<p class="mb-4 text-green-400 font-bold">You won the toss!</p><div class="flex gap-4 justify-center"><button onclick="app.makeTossDecision('BAT')" class="btn-theme px-6 py-3 rounded-xl w-32">BAT</button><button onclick="app.makeTossDecision('BOWL')" class="glass border-yellow-500 text-yellow-500 px-6 py-3 rounded-xl w-32 font-bold">BOWL</button></div>`; }
+                    else { a.innerHTML=`<p class="text-gray-400 pulse">Opponent deciding...</p>`; if(this.mode==='AI') setTimeout(()=>this.startMatch(Math.random()>0.5?'BAT':'BOWL'),1500); }
+                } else {
+                    if(this.role==='GUEST'||this.mode==='AI') a.innerHTML=`<p class="mb-4">Call the Toss</p><div class="flex gap-4 justify-center"><button onclick="app.callToss('Heads')" class="btn-theme px-6 py-3 rounded-xl w-32">HEADS</button><button onclick="app.callToss('Tails')" class="glass border-yellow-500 text-yellow-500 px-6 py-3 rounded-xl w-32 font-bold">TAILS</button></div>`;
+                    else a.innerHTML=`<p class="text-gray-400 pulse">Waiting for Guest to call...</p>`;
+                }
+            },
+            callToss(c) { if(this.mode==='AI')this.resolveToss(c); else{this.sendData('TOSS_CALL',c); document.getElementById('tossActionArea').innerHTML=`<p class="pulse">Flipping...</p>`;} },
+            resolveToss(gc) { this.state.toss={winner:(gc===(Math.random()>0.5?'Heads':'Tails'))?(this.mode==='AI'?'HOST':'GUEST'):'HOST', decision:null}; this.syncState(); },
+            makeTossDecision(d) { if(this.mode==='AI'||this.role==='HOST')this.startMatch(d); else this.sendData('TOSS_DECISION',d); },
+            startMatch(d) {
+                this.state.toss.decision=d; this.state.battingRole=(d==='BAT')?this.state.toss.winner:(this.state.toss.winner==='HOST'?'GUEST':'HOST');
+                this.state.phase='SELECT_OPENERS'; this.state.selectionsReady={HOST:false,GUEST:false}; this.syncState();
+            },
+
+            // SELECTION MODALS
+            openPlayerSelection(mode) {
+                this.psMode=mode; this.psSelections=[];
+                document.getElementById('psConfirmArea').classList.add('hidden');
+                document.getElementById('playerSelectionModal').classList.remove('hidden');
+                
+                const c = document.getElementById('psListContainer'); c.innerHTML='';
+                const stats = this.state.score[this.role].squadStats;
+                const names = this.state.squadNames[this.role];
+                
+                if(mode==='OPENERS' || mode==='BATSMAN') {
+                    document.getElementById('psModalTitle').innerText = mode==='OPENERS' ? "Select 2 Opening Batsmen" : "Select Next Batsman";
+                    stats.forEach((s, i) => {
+                        if(s.isActive && !s.out && !s.isBatting) {
+                            c.innerHTML += `<button onclick="app.togglePS(${i}, this)" class="w-full p-3 rounded-lg border border-slate-600 flex justify-between items-center bg-slate-800 hover:bg-slate-700 transition mb-2"><span class="font-semibold text-sm text-white">${names[i]}</span><i class="fas fa-check-circle text-transparent"></i></button>`;
+                        }
+                    });
+                } else if(mode==='BOWLER') {
+                    document.getElementById('psModalTitle').innerText = "Select Bowler";
+                    stats.forEach((s, i) => {
+                        if(s.isActive && this.state.current.bowlerIdx !== i) {
+                            c.innerHTML += `<button onclick="app.togglePS(${i}, this)" class="w-full p-3 rounded-lg border border-slate-600 flex justify-between items-center bg-slate-800 hover:bg-slate-700 transition mb-2"><span class="font-semibold text-sm text-white">${names[i]} <span class="text-xs text-gray-400">(${Math.floor(s.overBalls/6)}.${s.overBalls%6} O)</span></span><i class="fas fa-check-circle text-transparent"></i></button>`;
+                        }
+                    });
+                }
+            },
+            togglePS(idx, btn) {
+                const max = this.psMode==='OPENERS' ? 2 : 1;
+                const icon = btn.querySelector('i');
+                if(this.psSelections.includes(idx)) {
+                    this.psSelections = this.psSelections.filter(x=>x!==idx); icon.classList.replace('text-yellow-400','text-transparent'); btn.style.borderColor='#475569';
+                } else {
+                    if(this.psSelections.length >= max) return; 
+                    this.psSelections.push(idx); icon.classList.replace('text-transparent','text-yellow-400'); btn.style.borderColor='#F9CD05';
+                }
+                if(this.psSelections.length === max) { document.getElementById('psConfirmArea').classList.remove('hidden'); document.getElementById('btnConfirmPS').disabled=false; }
+                else { document.getElementById('psConfirmArea').classList.add('hidden'); }
+            },
+            confirmPlayerSelection() {
+                document.getElementById('playerSelectionModal').classList.add('hidden');
+                if(this.role==='HOST') {
+                    if(this.psMode==='OPENERS') { 
+                        this.state.current.strikerIdx=this.psSelections[0]; this.state.current.nonStrikerIdx=this.psSelections[1]; 
+                        this.state.score[this.role].squadStats[this.psSelections[0]].isBatting=true; this.state.score[this.role].squadStats[this.psSelections[1]].isBatting=true; 
+                        this.state.selectionsReady.HOST=true; this.checkPlayResume(); 
+                    } else if(this.psMode==='BATSMAN') { 
+                        this.state.current.strikerIdx=this.psSelections[0]; this.state.score[this.role].squadStats[this.psSelections[0]].isBatting=true; 
+                        this.state.needsBatter = false; this.checkNextPhase();
+                    } else if(this.psMode==='BOWLER') { 
+                        this.state.current.bowlerIdx=this.psSelections[0]; 
+                        this.state.needsBowler = false; this.checkNextPhase();
+                    }
+                    this.syncState();
+                } else {
+                    if(this.psMode==='OPENERS') { this.sendData('SELECT_BATTERS', this.psSelections); }
+                    else if(this.psMode==='BATSMAN') { this.sendData('SELECT_BATTER', this.psSelections[0]); }
+                    else if(this.psMode==='BOWLER') { this.sendData('SELECT_BOWLER', this.psSelections[0]); }
+                    this.setWaiting(true, "Waiting for Host...");
+                }
+            },
+            
+            checkPlayResume() {
+                if(this.state.phase === 'SELECT_OPENERS') {
+                    if(this.state.selectionsReady.HOST && this.state.selectionsReady.GUEST) {
+                        this.state.phase = 'PLAY' + this.state.innings;
+                        this.state.selectionsReady={HOST:false,GUEST:false};
+                    }
+                }
+            },
+            checkNextPhase() {
+                if(this.state.needsBatter) this.state.phase = 'SELECT_BATSMAN';
+                else if(this.state.needsBowler) this.state.phase = 'SELECT_BOWLER';
+                else this.state.phase = 'PLAY' + this.state.innings;
+            },
+
+            // AI BACKGROUND LOGIC
+            autoAISelection(mode) {
+                const stats = this.state.score['GUEST'].squadStats;
+                let valid = [];
+                if(mode==='OPENERS' || mode==='BATSMAN') {
+                    stats.forEach((s,i)=>{if(s.isActive&&!s.out&&!s.isBatting)valid.push(i);});
+                    if(mode==='OPENERS') return [valid[0], valid[1]]; else return valid[0];
+                } else {
+                    stats.forEach((s,i)=>{if(s.isActive&&this.state.current.bowlerIdx!==i)valid.push(i);});
+                    return valid[Math.floor(Math.random()*valid.length)] || 0; 
+                }
+            },
+            performAISelections() {
+                if(this.mode !== 'AI') return;
+                const s = this.state; let changed = false;
+
+                if (s.phase === 'SELECT_OPENERS' && !s.selectionsReady.GUEST) {
+                    if (s.battingRole === 'GUEST') {
+                        const ops = this.autoAISelection('OPENERS');
+                        s.current.strikerIdx = ops[0]; s.current.nonStrikerIdx = ops[1];
+                        s.score.GUEST.squadStats[ops[0]].isBatting = true; s.score.GUEST.squadStats[ops[1]].isBatting = true;
+                    } else { s.current.bowlerIdx = this.autoAISelection('BOWLER'); }
+                    s.selectionsReady.GUEST = true; this.checkPlayResume(); changed = true;
+                } else if (s.phase === 'SELECT_BATSMAN' && s.battingRole === 'GUEST') {
+                    const b = this.autoAISelection('BATSMAN'); s.current.strikerIdx = b;
+                    s.score.GUEST.squadStats[b].isBatting = true; s.needsBatter = false; this.checkNextPhase(); changed = true;
+                } else if (s.phase === 'SELECT_BOWLER' && s.battingRole !== 'GUEST') {
+                    s.current.bowlerIdx = this.autoAISelection('BOWLER'); s.needsBowler = false; this.checkNextPhase(); changed = true;
+                }
+
+                if(changed) this.syncState();
+            },
+
+            // PLAY LOGIC
+            makeMove(num) {
+                document.getElementById('uiResultBadge').classList.add('hidden');
+                document.getElementById('uiMyMove').innerText=num; document.getElementById('uiOppMove').innerText='?';
+                document.querySelectorAll('.number-btn, #btn-0').forEach(b=>{b.classList.remove('selected'); b.disabled=true;});
+                if(event && event.target) event.target.classList.add('selected');
+
+                if(this.role==='HOST') {
+                    this.pendingHostMove=num;
+                    if(this.mode==='AI') {
+                        const isAIBowl = (this.state.battingRole==='HOST');
+                        this.pendingGuestMove = isAIBowl ? (Math.floor(Math.random()*6)+1) : Math.floor(Math.random()*7);
+                    }
+                    this.checkResolveTurn();
+                } else { this.sendData('MOVE',num); document.getElementById('actionStatus').innerText="WAITING..."; }
+            },
+            checkResolveTurn() { if(this.pendingHostMove!==null && this.pendingGuestMove!==null) { const hm=this.pendingHostMove; const gm=this.pendingGuestMove; setTimeout(()=>this.processBall(hm,gm), 500); } },
+            processBall(hostNum, guestNum) {
+                this.pendingHostMove=null; this.pendingGuestMove=null;
+                const batR = this.state.battingRole; const bowlR = batR==='HOST'?'GUEST':'HOST';
+                const batNum = batR==='HOST'?hostNum:guestNum; const bowlNum = bowlR==='HOST'?hostNum:guestNum;
+
+                let isOut=false; let runs=0;
+                if(batNum===bowlNum && batNum!==0) isOut=true; else runs=batNum;
+
+                const batS = this.state.score[batR]; const bowlS = this.state.score[bowlR];
+                batS.balls+=1; 
+                const sIdx = this.state.current.strikerIdx; const bIdx = this.state.current.bowlerIdx;
+                batS.squadStats[sIdx].balls+=1;
+                bowlS.squadStats[bIdx].overBalls+=1; bowlS.squadStats[bIdx].runsConceded+=runs;
+
+                let needBatter = false; let needBowler = false; let turnComplete = false;
+
+                if(isOut) {
+                    batS.wickets+=1; bowlS.squadStats[bIdx].wicketsTaken+=1;
+                    batS.squadStats[sIdx].out=true; batS.squadStats[sIdx].isBatting=false;
+                    if(batS.wickets < this.state.maxWickets) needBatter = true;
+                } else {
+                    batS.runs+=runs; batS.squadStats[sIdx].runs+=runs;
+                    if(runs%2!==0) { const t=this.state.current.strikerIdx; this.state.current.strikerIdx=this.state.current.nonStrikerIdx; this.state.current.nonStrikerIdx=t; }
+                }
+
+                if(batS.balls%6===0 && !isOut) {
+                    const t=this.state.current.strikerIdx; this.state.current.strikerIdx=this.state.current.nonStrikerIdx; this.state.current.nonStrikerIdx=t;
+                    needBowler = true;
+                }
+
+                if(this.state.phase==='PLAY1') {
+                    if(batS.balls>=this.state.maxBalls || batS.wickets>=this.state.maxWickets) { this.state.phase='INNINGS_BREAK'; this.state.target=batS.runs+1; turnComplete=true; }
+                } else {
+                    if(batS.runs>=this.state.target) { this.state.phase='RESULT'; turnComplete=true; }
+                    else if(batS.balls>=this.state.maxBalls || batS.wickets>=this.state.maxWickets) { this.state.phase='RESULT'; turnComplete=true; }
+                }
+
+                this.state.lastBall = { batNum, bowlNum, isOut, runs };
+
+                if(turnComplete) { setTimeout(()=>this.processPhaseChange(), 2000); }
+                else {
+                    this.state.needsBatter = needBatter; this.state.needsBowler = needBowler;
+                    this.checkNextPhase();
+                    setTimeout(()=>this.syncState(), 1500); 
+                }
+            },
+            processPhaseChange() {
+                if(this.state.phase==='INNINGS_BREAK') {
+                    this.state.battingRole=this.state.battingRole==='HOST'?'GUEST':'HOST'; this.state.innings=2;
+                    this.state.current={strikerIdx:-1, nonStrikerIdx:-1, bowlerIdx:-1}; this.state.phase='SELECT_OPENERS'; this.state.selectionsReady={HOST:false,GUEST:false}; this.syncState();
+                }
+            },
+
+            // IMPACT PLAYER LOGIC
+            showImpactModal() {
+                document.getElementById('impactInList').innerHTML=''; document.getElementById('impactOutList').innerHTML='';
+                const stats = this.state.score[this.role].squadStats; const names = this.state.squadNames[this.role];
+                this.tempImpactIn=null; this.tempImpactOut=null; document.getElementById('btnConfirmSwap').disabled=true;
+                
+                for(let i=11; i<15; i++) {
+                    if(!stats[i].isActive && !stats[i].subbedOut) {
+                        document.getElementById('impactInList').innerHTML += `<button id="btnIn-${i}" onclick="app.selImpactIn(${i})" class="w-full p-2 rounded border border-slate-600 bg-slate-800 text-left mb-1 text-sm"><i class="fas fa-circle text-transparent mr-2"></i>${names[i]}</button>`;
+                    }
+                }
+                for(let i=0; i<15; i++) {
+                    if(stats[i].isActive) {
+                        document.getElementById('impactOutList').innerHTML += `<button id="btnOut-${i}" onclick="app.selImpactOut(${i})" class="w-full p-2 rounded border border-slate-600 bg-slate-800 text-left mb-1 text-sm"><i class="fas fa-circle text-transparent mr-2"></i>${names[i]} ${stats[i].out?'(Out)':''}</button>`;
+                    }
+                }
+                document.getElementById('impactSwapModal').classList.remove('hidden');
+            },
+            selImpactIn(idx) {
+                document.querySelectorAll('#impactInList button').forEach(b=>{b.style.borderColor='#475569'; b.querySelector('i').classList.replace('text-yellow-400','text-transparent')});
+                const b=document.getElementById(`btnIn-${idx}`); b.style.borderColor='#F9CD05'; b.querySelector('i').classList.replace('text-transparent','text-yellow-400');
+                this.tempImpactIn=idx; if(this.tempImpactOut!==null) document.getElementById('btnConfirmSwap').disabled=false;
+            },
+            selImpactOut(idx) {
+                document.querySelectorAll('#impactOutList button').forEach(b=>{b.style.borderColor='#475569'; b.querySelector('i').classList.replace('text-yellow-400','text-transparent')});
+                const b=document.getElementById(`btnOut-${idx}`); b.style.borderColor='#F9CD05'; b.querySelector('i').classList.replace('text-transparent','text-yellow-400');
+                this.tempImpactOut=idx; if(this.tempImpactIn!==null) document.getElementById('btnConfirmSwap').disabled=false;
+            },
+            confirmImpactSwap() {
+                document.getElementById('impactSwapModal').classList.add('hidden');
+                if(this.role==='HOST') this.applyImpactPlayer(this.role, this.tempImpactIn, this.tempImpactOut);
+                else this.sendData('IMPACT_SUB', {team:this.role, inIdx:this.tempImpactIn, outIdx:this.tempImpactOut});
+            },
+            applyImpactPlayer(team, inIdx, outIdx) {
+                const stats = this.state.score[team].squadStats;
+                stats[outIdx].subbedOut=true; stats[outIdx].isActive=false; stats[outIdx].isBatting=false;
+                stats[inIdx].isActive=true;
+                
+                if(this.state.battingRole===team) {
+                    if(this.state.current.strikerIdx===outIdx) { this.state.current.strikerIdx=inIdx; stats[inIdx].isBatting=true; }
+                    else if(this.state.current.nonStrikerIdx===outIdx) { this.state.current.nonStrikerIdx=inIdx; stats[inIdx].isBatting=true; }
+                } else { if(this.state.current.bowlerIdx===outIdx) this.state.current.bowlerIdx=inIdx; }
+                this.state.impactPlayerUsed[team]=true; this.syncState();
+            },
+
+            syncState() { 
+                if(this.mode==='MULTIPLAYER') this.sendData('STATE_SYNC', this.state); 
+                this.renderState(); 
+                if(this.mode==='AI' && this.role==='HOST') setTimeout(()=>this.performAISelections(), 150); 
+            },
+
+            // UI RENDERING
+            renderState() {
+                const s = this.state; if(!s) return;
+                this.setWaiting(false);
+                
+                if(s.phase==='TOSS') this.renderToss();
+                else if(s.phase.startsWith('PLAY')) this.renderGame();
+                else if(s.phase==='RESULT') this.renderResult();
+                else if(s.phase==='INNINGS_BREAK') { this.showScreen('screen-game'); document.getElementById('actionStatus').innerText="INNINGS BREAK"; document.querySelectorAll('.number-btn, #btn-0').forEach(b=>b.disabled=true); }
+                else if(s.phase.startsWith('SELECT_')) {
+                    this.showScreen('screen-game'); document.querySelectorAll('.number-btn, #btn-0').forEach(b=>b.disabled=true);
+                    
+                    if(s.phase==='SELECT_OPENERS') {
+                        if(this.role===s.battingRole && !s.selectionsReady[this.role]) this.openPlayerSelection('OPENERS');
+                        else if(this.role!==s.battingRole && !s.selectionsReady[this.role]) this.openPlayerSelection('BOWLER');
+                        else this.setWaiting(true, "Waiting for Opponent Selection...");
+                    } else if(s.phase==='SELECT_BATSMAN') {
+                        if(this.role===s.battingRole) this.openPlayerSelection('BATSMAN');
+                        else document.getElementById('actionStatus').innerText="WAITING FOR NEW BATTER";
+                    } else if(s.phase==='SELECT_BOWLER') {
+                        if(this.role!==s.battingRole) this.openPlayerSelection('BOWLER');
+                        else document.getElementById('actionStatus').innerText="WAITING FOR NEW BOWLER";
+                    }
+                }
+            },
+
+            renderGame() {
+                this.showScreen('screen-game'); const s = this.state;
+                const batR = s.battingRole; const bowlR = batR==='HOST'?'GUEST':'HOST';
+                const batT = s.teams[batR]; const bowlT = s.teams[bowlR];
+                const batS = s.score[batR]; const bowlS = s.score[bowlR];
+                const batSq = s.squadNames[batR]; const bowlSq = s.squadNames[bowlR];
+
+                document.documentElement.style.setProperty('--primary', TEAMS[batT].color); document.documentElement.style.setProperty('--primary-text', TEAMS[batT].textColor);
+                document.getElementById('uiBattingTeamName').innerText = TEAMS[batT].name;
+                document.getElementById('uiInningsText').innerText = `Innings ${s.innings}`;
+                document.getElementById('uiScore').innerText = batS.runs; document.getElementById('uiWickets').innerText = batS.wickets;
+                document.getElementById('uiOvers').innerHTML = `${Math.floor(batS.balls/6)}.${batS.balls%6}<span class="text-sm opacity-70">/${s.maxBalls/6}</span>`;
+
+                if(s.target) { document.getElementById('targetTracker').classList.remove('hidden'); document.getElementById('uiRunsNeeded').innerText = s.target - batS.runs; document.getElementById('uiBallsNeeded').innerText = s.maxBalls - batS.balls; }
+                else document.getElementById('targetTracker').classList.add('hidden');
+
+                const p1 = batS.squadStats[s.current.strikerIdx]; const p2 = batS.squadStats[s.current.nonStrikerIdx];
+                document.getElementById('uiStrikerName').innerText = p1 ? batSq[s.current.strikerIdx].split(' ')[0] : '-';
+                document.getElementById('uiStrikerRuns').innerText = p1 ? p1.runs : 0; document.getElementById('uiStrikerBalls').innerText = p1 ? p1.balls : 0;
+                document.getElementById('uiNonStrikerName').innerText = p2 ? batSq[s.current.nonStrikerIdx].split(' ')[0] : '-';
+                document.getElementById('uiNonStrikerRuns').innerText = p2 ? p2.runs : 0; document.getElementById('uiNonStrikerBalls').innerText = p2 ? p2.balls : 0;
+                
+                const bo = bowlS.squadStats[s.current.bowlerIdx];
+                document.getElementById('uiBowlerName').innerText = bo ? `${bowlSq[s.current.bowlerIdx].split(' ')[0]} (${Math.floor(bo.overBalls/6)}.${bo.overBalls%6}-${bo.runsConceded}-${bo.wicketsTaken})` : '-';
+
+                if(!s.impactPlayerUsed[this.role]) document.getElementById('btnImpact').classList.remove('hidden'); else document.getElementById('btnImpact').classList.add('hidden');
+
+                // Zero Button Visiblity Guard
+                const btn0 = document.getElementById('btn-0');
+                if (btn0) {
+                    if (this.role === batR || this.mode === 'AI') { btn0.style.display = 'block'; } else { btn0.style.display = 'none'; }
+                }
+
+                if(s.lastBall) {
+                    const isMyBat = (this.role===batR);
+                    document.getElementById('uiMyMove').innerText = isMyBat?s.lastBall.batNum:s.lastBall.bowlNum; document.getElementById('uiOppMove').innerText = isMyBat?s.lastBall.bowlNum:s.lastBall.batNum;
+                    const badge = document.getElementById('uiResultBadge'); badge.classList.remove('hidden');
+                    if(s.lastBall.isOut) { badge.innerText="OUT!"; badge.className="px-3 py-1 rounded-full font-bold text-lg bg-red-600 text-white animate-pulse"; AudioEngine.playOut(); Haptics.out(); }
+                    else { badge.innerText=s.lastBall.runs>0?`+${s.lastBall.runs}`:'DEFEND'; badge.className="px-3 py-1 rounded-full font-bold text-lg bg-green-600 text-white"; AudioEngine.playHit(); if(s.lastBall.runs>=4)Haptics.boundary(); else Haptics.run(); }
+                    delete s.lastBall;
+                }
+
+                document.querySelectorAll('.number-btn, #btn-0').forEach(b=>{b.classList.remove('selected'); b.disabled=false;});
+                document.getElementById('actionStatus').innerText = this.role===batR ? "YOUR TURN TO BAT" : "YOUR TURN TO BOWL";
+                document.getElementById('actionStatus').className = `text-center text-sm font-bold tracking-widest ${this.role===batR?'text-green-400':'text-red-400'} mb-4 h-5`;
+            },
+
+            renderResult() {
+                this.showScreen('screen-result'); const s = this.state;
+                document.getElementById('resTeam1Name').innerText = TEAMS[s.teams.HOST].name; document.getElementById('resTeam1Score').innerText = `${s.score.HOST.runs}/${s.score.HOST.wickets}`;
+                document.getElementById('resTeam2Name').innerText = TEAMS[s.teams.GUEST].name; document.getElementById('resTeam2Score').innerText = `${s.score.GUEST.runs}/${s.score.GUEST.wickets}`;
+                let t=""; if(s.score.HOST.runs>s.score.GUEST.runs) t=`${TEAMS[s.teams.HOST].id} Wins!`; else if(s.score.GUEST.runs>s.score.HOST.runs) t=`${TEAMS[s.teams.GUEST].id} Wins!`; else t="Match Tied!";
+                document.getElementById('resultText').innerText = t;
+            },
+
+            showScorecard() {
+                const c = document.getElementById('scorecardContent'); c.innerHTML='';
+                const s = this.state;
+                let batFirst = s.toss.decision==='BAT'?s.toss.winner:(s.toss.winner==='HOST'?'GUEST':'HOST');
+                let bowlFirst = batFirst==='HOST'?'GUEST':'HOST';
+                const order = [ {bat:batFirst, bowl:bowlFirst}, {bat:bowlFirst, bowl:batFirst} ];
+
+                order.forEach((inning, i) => {
+                    if(s.score[inning.bat].balls === 0) return; 
+                    const tId = s.teams[inning.bat]; const stats = s.score[inning.bat]; const sq = s.squadNames[inning.bat];
+                    const bId = s.teams[inning.bowl]; const bStats = s.score[inning.bowl]; const bSq = s.squadNames[inning.bowl];
+
+                    let h = `<div class="mb-8"><h4 class="font-bold text-lg mb-2" style="color:${TEAMS[tId].color}">${TEAMS[tId].name} <span class="text-white text-sm float-right">${stats.runs}/${stats.wickets} (${Math.floor(stats.balls/6)}.${stats.balls%6})</span></h4>
+                        <div class="bg-black bg-opacity-40 rounded-lg overflow-hidden text-sm mb-2"><table class="w-full text-left"><thead class="bg-slate-800 text-gray-400 text-[10px] uppercase"><tr><th class="p-2">Batter</th><th class="p-2 text-right">R</th><th class="p-2 text-right">B</th><th class="p-2 text-right">SR</th></tr></thead><tbody class="divide-y divide-slate-700">`;
+
+                    stats.squadStats.forEach((p, idx) => {
+                        if(p.balls>0 || p.isBatting) {
+                            const sr = p.balls>0 ? ((p.runs/p.balls)*100).toFixed(1) : '0.0';
+                            let st = p.out?'text-gray-400':'text-white font-bold'; let note='';
+                            if(p.subbedOut)note='<span class="text-[10px] text-gray-500 ml-1">(Sub)</span>'; else if(p.out)note='<span class="text-[10px] text-red-400 ml-1">out</span>'; else note='<span class="text-[10px] text-green-400 ml-1">*</span>';
+                            h+= `<tr class="${st}"><td class="p-2">${sq[idx].split(' ')[0]} ${note}</td><td class="p-2 text-right">${p.runs}</td><td class="p-2 text-right">${p.balls}</td><td class="p-2 text-right text-xs">${sr}</td></tr>`;
+                        }
+                    });
+                    
+                    h += `</tbody></table></div><div class="bg-black bg-opacity-40 rounded-lg overflow-hidden text-sm"><table class="w-full text-left"><thead class="bg-slate-800 text-gray-400 text-[10px] uppercase"><tr><th class="p-2">Bowler</th><th class="p-2 text-right">O</th><th class="p-2 text-right">R</th><th class="p-2 text-right">W</th><th class="p-2 text-right">Econ</th></tr></thead><tbody class="divide-y divide-slate-700">`;
+                    bStats.squadStats.forEach((p, idx) => {
+                        if(p.overBalls>0) {
+                            const ov = Math.floor(p.overBalls/6)+'.'+(p.overBalls%6);
+                            const econ = ((p.runsConceded / p.overBalls) * 6).toFixed(1);
+                            h+= `<tr class="text-gray-300"><td class="p-2">${bSq[idx].split(' ')[0]}</td><td class="p-2 text-right">${ov}</td><td class="p-2 text-right">${p.runsConceded}</td><td class="p-2 text-right font-bold text-white">${p.wicketsTaken}</td><td class="p-2 text-right text-xs">${econ}</td></tr>`;
+                        }
+                    });
+
+                    c.innerHTML += h + `</tbody></table></div></div>`;
+                });
+                document.getElementById('scorecardModal').classList.remove('hidden');
+            }
+        };
+
+        window.onload = () => app.init();
+    </script>
+</body>
+</html>
+
+
